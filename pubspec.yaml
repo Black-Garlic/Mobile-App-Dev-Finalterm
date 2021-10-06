@@ -1,0 +1,35 @@
+name: shrine
+description: Learn how to use Material for structure and layout.
+
+environment:
+  sdk: '>=2.13.0 <3.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  intl: ^0.17.0-nullsafety.2
+
+  cupertino_icons: ^1.0.3
+  shrine_images: ^2.0.1
+  url_launcher: ^6.0.10
+  animated_text_kit: ^4.2.1
+  lottie: ^1.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^1.0.0
+
+flutter:
+  # TODO: Insert Fonts (103)
+  uses-material-design: true
+  assets:
+    - assets/diamond.png
+    - assets/garlic_icon.png
+    - assets/골든 튤립 호텔.jpg
+    - assets/라비드 아틀란 호텔.jpg
+    - assets/마리안느 호텔.jpg
+    - assets/베니키아 프리미어 호텔.jpg
+    - assets/이비스 앰배서더 호텔.jpg
+    - assets/하운드 호텔.jpg
+    - assets/stay-safe-stay-home.json
