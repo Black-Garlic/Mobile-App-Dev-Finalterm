@@ -12,82 +12,56 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'main.dart';
 import 'model/products_repository.dart';
 import 'model/product.dart';
 import 'package:animated_text_kit/animated_text_kit.dart';
 import 'package:lottie/lottie.dart';
 
-class MyPage extends StatelessWidget {
+class MyPage extends StatefulWidget {
   const MyPage({
     Key? key,
   }) : super(key: key);
 
-  List<Card> _hotelList(BuildContext context) {
-    List<Product> products = ProductsRepository().loadFavoriteProducts();
+  @override
+  _MyPageState createState() => _MyPageState();
+}
 
-    return products.map((product) {
-      return Card (
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          children: [
-            Material(
-              child: InkWell(
-                onTap: () {
-                  Navigator.pushNamed(
-                    context,
-                    '/detail',
-                    arguments: Product(
-                      id: product.id,
-                      isFeatured: product.isFeatured,
-                      star: product.star,
-                      name: product.name,
-                      address: product.address,
-                      phone: product.phone,
-                      desc: product.desc,
-                    ),
-                  );
-                },
-                child: Image.asset(
-                  product.assetName,
-                  width: 600,
-                  height: 240,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: 40,
-              left: 15,
-              child: Text(
-                product.name,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20,
-                )
-              )
-            ),
-            Positioned(
-                bottom: 15,
-                left: 15,
-                child: Text(
-                    product.address,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 18,
-                    )
-                )
-            ),
-          ],
-        ),
-      );
-    }).toList();
+class _MyPageState extends State<MyPage> {
+  String _id = "";
+  String _uid = "";
+  String _email = "Anonymous";
+  String _name = "Anonymous";
+  String _statusMessage = "I promise to take the test honestly before GOD";
+
+  final _statusMessageController = TextEditingController();
+  bool _edit = false;
+
+  Future<ListView> _getUserInfo() async {
+
+    QuerySnapshot _myDoc = await FirebaseFirestore.instance
+        .collection('user')
+        .where('uid', isEqualTo: FirebaseAuth.instance.currentUser!.uid)
+        .get();
+
+    for (final document in _myDoc.docs) {
+      _id = document.id;
+      _uid = document['uid'] as String;
+      _statusMessage = document['status_message'] as String;
+      if (!FirebaseAuth.instance.currentUser!.isAnonymous) {
+        _email = document['email'] as String;
+        _name = document['name'] as String;
+      }
+    }
+    return ListView();
   }
 
   @override
@@ -97,97 +71,164 @@ class MyPage extends StatelessWidget {
       title: 'Flutter layout demo',
       home: Scaffold(
         appBar: AppBar(
-          title: const Text('Favorite'),
-        ),
-        body: ListView (
-          children: [
-            Column(
-              children: [
-                ClipOval(
-                  clipper: MyClipper(),
-                  child: Lottie.asset('assets/stay-safe-stay-home.json'),
-                ),
-                const Text(
-                  'Yoon Ha Neul',
-                  style: TextStyle(
-                      fontSize: 25,
-                      fontWeight: FontWeight.w700
-                  ),
-                ),
-                const Text(
-                  '21500453',
-                  style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w400
-                  ),
-                ),
-              ],
-            ),
-            const ListTile(
-              title: Text(
-                'My Favorite Hotel List',
-                style: TextStyle(
-                    fontSize: 25,
-                    fontWeight: FontWeight.w700
-                ),
+          leading: TextButton(
+            child: const Text(
+              'Back',
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 12,
               ),
             ),
-            Column(
-              children: _hotelList(context),
-            )
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: const Text('Profile'),
+          centerTitle: true,
+          actions: <Widget>[
+            IconButton(
+              icon: const Icon(
+                Icons.logout,
+                semanticLabel: 'filter',
+              ),
+              onPressed: () {
+                Navigator.pushNamed(context, '/login');
+                FirebaseAuth.instance.signOut();
+              },
+            ),
           ],
         ),
+        body: Consumer<ApplicationState>(
+          builder: (context, appState, _) => FutureBuilder<ListView>(
+            future: _getUserInfo(),
+            builder: (BuildContext context, AsyncSnapshot snapshot) {
+              if (snapshot.hasData) {
+                return ListView (
+                  children: [
+                    FirebaseAuth.instance.currentUser!.isAnonymous ?
+                    Column(
+                      children: [
+                        Image.network(
+                          "http://handong.edu/site/handong/res/img/logo.png",
+                          width: 200,
+                          height: 200,
+                          fit: BoxFit.cover,
+                        ),
+                        Text(
+                          _uid,
+                          style: const TextStyle(
+                              fontSize: 25,
+                              fontWeight: FontWeight.w700
+                          ),
+                        ),
+                        const Text(
+                          'Anonymous',
+                          style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w400
+                          ),
+                        ),
+                      ],
+                    )
+                        :
+                    Column(
+                      children: [
+                        Image.network(
+                          FirebaseAuth.instance.currentUser!.photoURL.toString(),
+                          width: 200,
+                          height: 200,
+                          fit: BoxFit.cover,
+                        ),
+                        Text(
+                          _uid,
+                          style: const TextStyle(
+                              fontSize: 25,
+                              fontWeight: FontWeight.w700
+                          ),
+                        ),
+                        Text(
+                          _email,
+                          style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w400
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 100,),
+                    ListTile(
+                      title: Text(
+                        _name,
+                        style: const TextStyle(
+                            fontSize: 25,
+                            fontWeight: FontWeight.w700
+                        ),
+                      ),
+                    ),
+                    ListTile(
+                      title: _edit == false ?
+                      Text(
+                        _statusMessage,
+                        style: const TextStyle(
+                          fontSize: 25,
+                          fontWeight: FontWeight.w700
+                        ),
+                      )
+                      :
+                      TextFormField(
+                        controller: _statusMessageController..text = _statusMessage,
+                        decoration: const InputDecoration(
+                          hintText: 'Status Message',
+                        ),
+                        style: const TextStyle(
+                            color: Colors.black,
+                            fontSize: 25
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Enter your message to continue';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                    ListTile(
+                      title: TextButton(
+                        child: Text(
+                          _edit == false ? 'Edit' : 'Save',
+                          style: const TextStyle(
+                              fontSize: 25,
+                              fontWeight: FontWeight.w700
+                          ),
+                        ),
+                        onPressed: () async => {
+                          if (_edit == false) {
+                            setState(() {
+                              _edit = true;
+                            })
+                          } else {
+                            FirebaseFirestore.instance
+                                .collection('user')
+                                .doc(_id)
+                                .update({
+                            'status_message': _statusMessageController.value.text,
+                            }),
+                            setState(() {
+                              _edit = false;
+                            })
+                          },
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              } else {
+                return ListView();
+              }
+            }
+          )
+        )
       ),
-    );
-  }
-}
-
-class MyClipper extends CustomClipper<Rect>{
-
-  @override
-  Rect getClip(Size size) {
-    return Rect.fromLTWH(82, 82, size.width - 164, size.height - 164);
-  }
-
-  @override
-  bool shouldReclip(CustomClipper<Rect> oldClipper) {
-    return false;
-  }
-}
-
-class FavoriteList extends StatefulWidget {
-  const FavoriteList({
-    Key? key,
-  }) : super(key: key);
-
-  @override
-  _FavoriteState createState() => _FavoriteState();
-}
-
-class _FavoriteState extends State<FavoriteList> {
-  @override
-  Widget build(BuildContext context) {
-    List<Product> products = ProductsRepository().loadFavoriteProducts();
-
-    return Expanded(
-      child:ListView.builder(
-          itemCount: products.length,
-          itemBuilder: (context, index) {
-            return Dismissible(
-              key: Key(products[index].id.toString()),
-              onDismissed: (direction) {
-                setState(() {
-                  ProductsRepository().changeProduct(products[index].id, false);
-                  products.removeAt(index);
-                });
-              },
-              background: Container (color: Colors.red),
-              child: ListTile(
-                title: Text(products[index].name),
-              ),
-            );
-          }
-      )
     );
   }
 }

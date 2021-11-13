@@ -12,11 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:shrine/detail.dart';
+import 'package:shrine/model/item.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:firebase_storage/firebase_storage.dart' as firebase_storage;
 
+import 'main.dart';
 import 'model/products_repository.dart';
 import 'model/product.dart';
 
@@ -28,34 +34,31 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final isSelected = <bool>[true, false];
-  List<Product> products = ProductsRepository().loadProducts();
-  List<int> favorite = List.generate(0, (index) => 0);
+  String orderBy = "ASC";
+  int index = -1;
 
-  List<Card> _buildGridCards(BuildContext context) {
-    if (products.isEmpty) {
+  List<Card> _buildGridCards(BuildContext context, ApplicationState appState) {
+    print("build grid");
+
+    if (appState.item.isEmpty) {
       return const <Card>[];
     }
 
-    final ThemeData theme = Theme.of(context);
-    final NumberFormat formatter = NumberFormat.simpleCurrency(
-        locale: Localizations.localeOf(context).toString());
+    print("length" + appState.item.length.toString());
 
-    return products.map((product) {
+    return appState.item.map((product) {
+      int index = appState.item.indexOf(product);
       return Card(
         clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             AspectRatio(
-              aspectRatio: 18 / 12,
-              child: Hero(
-                tag: 'hotelImage-' + product.assetName,
-                child: Image.asset(
-                  product.assetName,
-                  fit: BoxFit.fitWidth,
-                ),
-              )
+              aspectRatio: 17 / 12,
+              child: Image.network(
+                product.image,
+                fit: BoxFit.fitWidth,
+              ),
             ),
             Expanded(
               child: Padding(
@@ -63,13 +66,6 @@ class _HomePageState extends State<HomePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Row(
-                      children: [
-                        Icon(product.star >= 1 ? Icons.star: Icons.star_border, color: Colors.yellow),
-                        Icon(product.star >= 2 ? Icons.star: Icons.star_border, color: Colors.yellow),
-                        Icon(product.star >= 3 ? Icons.star: Icons.star_border, color: Colors.yellow),
-                      ],
-                    ),
                     const SizedBox(height: 4.0),
                     Text(
                       product.name,
@@ -80,10 +76,10 @@ class _HomePageState extends State<HomePage> {
                     ),
                     const SizedBox(height: 4.0),
                     Text(
-                      product.address,
+                      "\$ " + product.price.toString(),
                       style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
@@ -96,19 +92,10 @@ class _HomePageState extends State<HomePage> {
                 textAlign: TextAlign.end,
               ),
               onPressed: () {
-                print(product.id);
                 Navigator.pushNamed(
                   context,
                   '/detail',
-                  arguments: Product(
-                    id: product.id,
-                    isFeatured: product.isFeatured,
-                    star: product.star,
-                    name: product.name,
-                    address: product.address,
-                    phone: product.phone,
-                    desc: product.desc,
-                  )
+                  arguments: index,
                 );
               },
             )
@@ -118,243 +105,90 @@ class _HomePageState extends State<HomePage> {
     }).toList();
   }
 
-  Card _buildListCard(BuildContext context, int index) {
-    Product product = products[index];
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(10.0),
-        leading: Image.asset(
-          product.assetName,
-          fit: BoxFit.fitWidth,
-        ),
-        title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(product.star >= 1 ? Icons.star: Icons.star_border, color: Colors.yellow),
-                  Icon(product.star >= 2 ? Icons.star: Icons.star_border, color: Colors.yellow),
-                  Icon(product.star >= 3 ? Icons.star: Icons.star_border, color: Colors.yellow),
-                ],
-              ),
-              Text(product.name),
-            ]
-        ),
-        subtitle: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(product.address),
-            TextButton(
-              child: const Text(
-                'more',
-                textAlign: TextAlign.end,
-              ),
-              onPressed: () {
-                Navigator.pushNamed(
-                  context,
-                  '/detail',
-                  arguments: Product(
-                    id: product.id,
-                    isFeatured: product.isFeatured,
-                    star: product.star,
-                    name: product.name,
-                    address: product.address,
-                    phone: product.phone,
-                    desc: product.desc,
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void>? _launched;
-
-  Future<void> _launchInBrowser(String url) async {
-    if (await canLaunch(url)) {
-      await launch(
-        url,
-      );
-    } else {
-      throw 'Could not launch $url';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Main'),
+        leading: IconButton(
+          icon: const Icon(
+            Icons.person,
+          ),
+          onPressed: () {
+            Navigator.pushNamed(context, '/my page');
+          },
+        ),
+        title: Consumer<ApplicationState>(
+          builder: (context, appState, _) => Text(
+          FirebaseAuth.instance.currentUser!.isAnonymous ?
+          'Welcome Guest!'
+          :
+          'Welcome ' + appState.user.user!.displayName.toString() + '!'
+          ),
+        ),
+        centerTitle: true,
         actions: <Widget>[
           IconButton(
             icon: const Icon(
-              Icons.search,
-              semanticLabel: 'search',
-            ),
-            onPressed: () {
-              Navigator.pushNamed(context, '/search');
-            },
-          ),
-          IconButton(
-            icon: const Icon(
-              Icons.language,
+              Icons.add,
               semanticLabel: 'filter',
             ),
             onPressed: () => setState(() {
-              _launched = _launchInBrowser("https://www.handong.edu/");
+              Navigator.pushNamed(context, '/add');
             }),
           ),
         ],
       ),
-      drawer: Drawer(
-        child: ListView(
-          // Important: Remove any padding from the ListView.
-          padding: EdgeInsets.zero,
-          children: [
-            const DrawerHeader(
-              decoration: BoxDecoration(
-                color: Colors.blue,
-              ),
-              padding:EdgeInsets.fromLTRB(20, 110, 10, 0),
-              child: Text(
-                'Pages',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 25,
+      body: ChangeNotifierProvider(
+        create: (context) => DropDownProvider(),
+        builder: (context, _) => Consumer<ApplicationState>(
+          builder: (context, appState, _) => Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Padding (
+                padding: const EdgeInsets.fromLTRB(0, 10, 20, 0),
+                child: DropdownButton<String>(
+                  value: orderBy,
+                  icon: const Icon(Icons.arrow_drop_down),
+                  iconSize: 24,
+                  elevation: 16,
+                  style: const TextStyle(color: Colors.black),
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      orderBy = newValue!;
+                      if (orderBy == "ASC") {
+                        print("Load Asc");
+                        appState.sortProduct(true);
+                      } else {
+                        print("Load Desc");
+                        appState.sortProduct(false);
+                      }
+                    });
+                  },
+                  items: <String>['ASC', 'DESC']
+                      .map<DropdownMenuItem<String>>((String value) {
+                    return DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(value),
+                    );
+                  }).toList(),
                 ),
               ),
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.home,
-                semanticLabel: 'home',
-                color: Colors.blue,
-              ),
-              title: const Text('Home'),
-              onTap: () {
-                // Update the state of the app
-                // ...
-                // Then close the drawer
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.search,
-                semanticLabel: 'search',
-                color: Colors.blue,
-              ),
-              title: const Text('Search'),
-              onTap: () {
-                // Update the state of the app
-                // ...
-                // Then close the drawer
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/search');
-              },
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.location_city,
-                semanticLabel: 'location_city',
-                color: Colors.blue,
-              ),
-              title: const Text('Favorite Hotel'),
-              onTap: () {
-                // Update the state of the app
-                // ...
-                // Then close the drawer
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/favorite');
-              },
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.person,
-                semanticLabel: 'person',
-                color: Colors.blue,
-              ),
-              title: const Text('My Page'),
-              onTap: () {
-                // Update the state of the app
-                // ...
-                // Then close the drawer
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/my page');
-              },
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.logout,
-                semanticLabel: 'logout',
-                color: Colors.blue,
-              ),
-              title: const Text('Log Out'),
-              onTap: () {
-                // Update the state of the app
-                // ...
-                // Then close the drawer
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/login');
-              },
-            ),
-          ],
-        ),
-      ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Padding (
-            padding: EdgeInsets.fromLTRB(0, 10, 20, 0),
-            child: ToggleButtons(
-              // ignore: prefer_const_literals_to_create_immutables
-              children: [
-                const Icon(Icons.view_list),
-                const Icon(Icons.grid_view),
-              ],
-              isSelected: isSelected,
-              onPressed: (index) {
-                // Respond to button selection
-                setState(() {
-                  for (int buttonIndex = 0; buttonIndex < isSelected.length; buttonIndex++) {
-                    if (buttonIndex == index) {
-                      isSelected[buttonIndex] = true;
-                    } else {
-                      isSelected[buttonIndex] = false;
+              Expanded(
+                child: OrientationBuilder(
+                    builder: (context, orientation) {
+                      return GridView.count(
+                        crossAxisCount: orientation == Orientation.portrait ? 2 : 3,
+                        padding: const EdgeInsets.all(16.0),
+                        childAspectRatio: 8.0 / 12.0,
+                        children: _buildGridCards(context, appState),
+                      );
                     }
-                  }
-                });
-              },
-            ),
-          ),
-
-          Expanded(
-            child: isSelected[0] ?
-              OrientationBuilder(
-                builder: (context, orientation) {
-                  return GridView.count(
-                    crossAxisCount: orientation == Orientation.portrait ? 2 : 3,
-                    padding: const EdgeInsets.all(16.0),
-                    childAspectRatio: 8.0 / 12.0,
-                    children: _buildGridCards(context),
-                  );
-                }
-              )
-             :
-              ListView.builder (
-                itemCount: products.length,
-                padding: const EdgeInsets.all(16.0),
-                itemBuilder: (BuildContext context, int index){
-                  return _buildListCard(context, index);
-                },
+                ),
               ),
-          )
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }

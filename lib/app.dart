@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 
 import 'home.dart';
 import 'login.dart';
+import 'model/item.dart';
 import 'signup.dart';
 import 'detail.dart';
-import 'search.dart';
+import 'add.dart';
 import 'favorite.dart';
 import 'mypage.dart';
 import './model/product.dart';
@@ -21,21 +22,22 @@ class ShrineApp extends StatelessWidget {
       routes: {
         '/login': (context) => const LoginPage(),
         '/sign up': (context) => const SignUpPage(),
-        '/search': (context) => const SearchPage(),
+        '/add': (context) => const AddPage(),
         '/favorite': (context) => const FavoritePage(),
         '/my page': (context) => const MyPage(),
       },
       onGenerateRoute: (routeSettings) {
         if (routeSettings.name == '/detail') {
-          final product = routeSettings.arguments as Product;
+          int id = routeSettings.arguments as int;
           return MaterialPageRoute(
             builder: (context) {
               return DetailPage(
-                id: product.id,
+                id: id,
               );
             }
           );
         }
+        return null;
       },
     );
   }
